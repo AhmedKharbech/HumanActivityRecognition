@@ -1,0 +1,86 @@
+---
+title: "Human Activity Recognition"
+date: "10/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+
+## Getting data
+We will dowload the training data as well as the test data
+
+```{r  echo=TRUE}
+train_url<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url = train_url,destfile ="pml-training.csv")
+download.file(url = test_url,destfile ="pml-testing.csv")
+
+training_raw<-read.csv(file = "pml-training.csv",header = TRUE,sep = ",")
+testing_raw<-read.csv(file = "pml-testing.csv",header = TRUE,sep = ",")
+```
+
+## Cleaning Data
+
+The first 7 columns should be removed because they have no influence on exercice classe.
+Many columns are filled with NAs, we have to delete the missed data so that our models would be accurate.
+
+```{r  echo=TRUE}
+set.seed(123)
+library(caret)
+#deleting the first 7 columns
+training_raw<-training_raw[,-c(1:7)]
+#removing NAs
+training_raw<-training_raw[,colSums(is.na(training_raw))==0]
+#Some variables have near zero variances
+nzv<-nearZeroVar(training_raw)
+training_raw<-training_raw[,-nzv]
+
+
+```
+
+## Spliting data
+Once we cleaned the data, we need to split it into a training and testing data.
+
+```{r  echo=TRUE}
+
+intrain<-createDataPartition(y=training_raw$classe,p=0.75,list=FALSE)
+training<-training_raw[intrain,]
+testing<-training_raw[-intrain,]
+```
+
+## Fitting models
+let's fit a random forest model to our data:
+
+```{r  echo=TRUE}
+rf_model<-train(classe~.,data=training,method="rf",trControl=trainControl(method="cv",number=3,verboseIter = FALSE))
+pred_training<-predict(rf_model,training)
+confusionMatrix(pred_training,training$classe)
+```
+
+We have an accuracy 1 with 95% CI. It is a high accuracy and there is no overfitting.
+
+Let's keep the random forest model and predict the data for the testing data set.
+```{r  echo=TRUE}
+
+pred_training<-predict(rf_model,testing)
+confusionMatrix(pred_training,testing$classe)
+```
+
+For the test data set we have 99,5% accuracy.
+
+## Random forest model on the submit data
+
+```{r  echo=TRUE}
+
+pred_submit<-predict(rf_model,testing_raw)
+pred_submit
+```
